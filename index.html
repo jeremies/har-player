@@ -515,24 +515,38 @@
         </div>
 
         <div class="presets-row">
-          <label for="presetSelect">Live & Remote Presets:</label>
-          <select id="presetSelect">
-            <option value="https://offline-har-player.local/video/master.m3u8">
-              Local HAR Fixture (360p, 720p, 1080p)
-            </option>
-            <option value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
-              Mux Big Buck Bunny (Live Remote)
-            </option>
-            <option value="https://cdn.jwplayer.com/manifests/pfx9vflz.m3u8">
-              Tears of Steel (Live Remote)
-            </option>
-            <option
-              value="https://playertest.longtailvideo.com/adaptive/elephants_dream/elephants_dream.m3u8"
+          <div style="display: flex; align-items: center; gap: 8px">
+            <label for="playerEngineSelect"
+              ><strong>Player Engine:</strong></label
             >
-              Elephants Dream (Live Remote)
-            </option>
-            <option value="custom">Custom URL</option>
-          </select>
+            <select id="playerEngineSelect">
+              <option value="hlsjs">HLS.js (Default)</option>
+              <option value="bitmovin">Bitmovin Player</option>
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px">
+            <label for="presetSelect">Live & Remote Presets:</label>
+            <select id="presetSelect">
+              <option
+                value="https://offline-har-player.local/video/master.m3u8"
+              >
+                Local HAR Fixture (360p, 720p, 1080p)
+              </option>
+              <option value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
+                Mux Big Buck Bunny (Live Remote)
+              </option>
+              <option value="https://cdn.jwplayer.com/manifests/pfx9vflz.m3u8">
+                Tears of Steel (Live Remote)
+              </option>
+              <option
+                value="https://playertest.longtailvideo.com/adaptive/elephants_dream/elephants_dream.m3u8"
+              >
+                Elephants Dream (Live Remote)
+              </option>
+              <option value="custom">Custom URL</option>
+            </select>
+          </div>
         </div>
 
         <div class="actions-row">
@@ -554,6 +568,15 @@
         <div class="player-section">
           <div class="video-wrapper">
             <video id="videoPlayer" controls playsinline></video>
+            <div
+              id="bitmovinContainer"
+              style="
+                display: none;
+                width: 100%;
+                height: 100%;
+                position: relative;
+              "
+            ></div>
           </div>
 
           <div class="telemetry-panel">
@@ -561,12 +584,18 @@
               <h3>Player Status</h3>
               <div class="stat-grid">
                 <div class="stat-item">
+                  <span class="stat-label">Active Engine</span>
+                  <span class="stat-value" id="statEngine"
+                    ><span class="badge badge-info">HLS.js</span></span
+                  >
+                </div>
+                <div class="stat-item">
                   <span class="stat-label">Playback State</span>
                   <span class="stat-value" id="statState"
                     ><span class="badge badge-warning">Idle</span></span
                   >
                 </div>
-                <div class="stat-item">
+                <div class="stat-item" style="grid-column: span 2">
                   <span class="stat-label">Mode</span>
                   <span class="stat-value" id="statMode">Auto (Filtered)</span>
                 </div>
