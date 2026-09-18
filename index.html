@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HAR Player - HLS & Mock Service Worker Replay</title>
+    <style>
+      :root {
+        --bg-color: #0f172a;
+        --card-bg: #1e293b;
+        --border-color: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-hover: #0284c7;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --font:
+          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family: var(--font);
+        line-height: 1.5;
+        padding: 24px;
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      header h1 {
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      header p {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-top: 4px;
+      }
+
+      .card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      }
+
+      .card h2 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .card-title-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      @media (min-width: 768px) {
+        .form-grid-3 {
+          grid-template-columns: 2fr 1fr 1fr;
+        }
+        .form-grid-2 {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+
+      input,
+      select {
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 10px 14px;
+        color: var(--text-main);
+        font-size: 0.95rem;
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      input:focus,
+      select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+      }
+
+      .presets-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+        font-size: 0.875rem;
+        flex-wrap: wrap;
+      }
+
+      .actions-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .btn {
+        background-color: var(--accent);
+        color: #0f172a;
+        font-weight: 600;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 20px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition:
+          background-color 0.2s,
+          transform 0.1s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn:hover {
+        background-color: var(--accent-hover);
+        color: #ffffff;
+      }
+
+      .btn:active {
+        transform: scale(0.98);
+      }
+
+      .btn-secondary {
+        background-color: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+      }
+
+      .btn-secondary:hover {
+        background-color: var(--border-color);
+        color: var(--text-main);
+      }
+
+      .btn-danger-outline {
+        background-color: transparent;
+        border: 1px solid var(--danger);
+        color: var(--danger);
+      }
+
+      .btn-danger-outline:hover {
+        background-color: var(--danger);
+        color: #ffffff;
+      }
+
+      /* HAR Dropzone */
+      .dropzone {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 24px;
+        text-align: center;
+        background-color: rgba(15, 23, 42, 0.5);
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background-color 0.2s;
+      }
+
+      .dropzone.drag-over {
+        border-color: var(--accent);
+        background-color: rgba(56, 189, 248, 0.08);
+      }
+
+      .dropzone-icon {
+        font-size: 2rem;
+        margin-bottom: 8px;
+        display: block;
+      }
+
+      .info-box {
+        background-color: #0f172a;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 12px 16px;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-top: 12px;
+        line-height: 1.6;
+      }
+
+      .info-box code {
+        color: var(--accent);
+        background-color: rgba(56, 189, 248, 0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .player-section {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      @media (min-width: 900px) {
+        .player-section {
+          grid-template-columns: 3fr 2fr;
+        }
+      }
+
+      .video-wrapper {
+        position: relative;
+        width: 100%;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        aspect-ratio: 16 / 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .telemetry-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .telemetry-card {
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .telemetry-card h3 {
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .stat-item {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .stat-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-main);
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .badge-success {
+        background: rgba(34, 197, 94, 0.2);
+        color: var(--success);
+      }
+      .badge-warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+      }
+      .badge-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--danger);
+      }
+      .badge-info {
+        background: rgba(56, 189, 248, 0.2);
+        color: var(--accent);
+      }
+      .badge-secondary {
+        background: rgba(148, 163, 184, 0.2);
+        color: var(--text-muted);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 0.9rem;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      th {
+        color: var(--text-muted);
+        font-weight: 600;
+        background-color: var(--bg-color);
+      }
+
+      tr.allowed-variant {
+        background-color: rgba(34, 197, 94, 0.05);
+      }
+
+      tr.filtered-variant {
+        opacity: 0.4;
+        background-color: rgba(255, 255, 255, 0.01);
+      }
+
+      tr.active-variant {
+        background-color: rgba(56, 189, 248, 0.15);
+        border-left: 3px solid var(--accent);
+      }
+
+      .log-box {
+        background-color: #090d16;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.85rem;
+        height: 160px;
+        overflow-y: auto;
+        color: #a7f3d0;
+      }
+
+      .log-entry {
+        margin-bottom: 4px;
+        word-break: break-all;
+      }
+      .log-entry.error {
+        color: #fca5a5;
+      }
+      .log-entry.warn {
+        color: #fde047;
+      }
+      .log-entry.info {
+        color: #93c5fd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>📡 HAR Player & HLS Filter</h1>
+        <p>
+          Play M3U8 video streams from network URLs or replay captured traffic
+          directly from HTTP Archive (.har) files via Mock Service Worker
+        </p>
+      </header>
+
+      <!-- MSW & HAR Replay Section -->
+      <div class="card">
+        <h2>
+          <span class="card-title-left"
+            >🛠️ Mock Service Worker (MSW) & HAR Replayer</span
+          >
+          <span id="mswStatusBadge" class="badge badge-secondary"
+            >Initializing...</span
+          >
+        </h2>
+
+        <div
+          class="dropzone"
+          id="harDropZone"
+          onclick="document.getElementById('harFileInput').click()"
+        >
+          <span class="dropzone-icon">📁</span>
+          <p>
+            <strong>Drag and drop a <code>.har</code> file here</strong> or
+            click to select
+          </p>
+          <p
+            style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px"
+          >
+            MSW will intercept HTTP/HTTPS calls and replay recorded M3U8
+            manifests and media chunks (.ts, .m4s)
+          </p>
+          <input
+            type="file"
+            id="harFileInput"
+            accept=".har,application/json"
+            style="display: none"
+          />
+        </div>
+
+        <div id="harInfoBox" class="info-box" style="display: none"></div>
+
+        <div class="form-group" style="margin-top: 14px">
+          <label for="harDiscoveredStreamsSelect"
+            >Discovered M3U8 Playlists in HAR:</label
+          >
+          <select id="harDiscoveredStreamsSelect" disabled>
+            <option value="">Upload a HAR file to detect playlists...</option>
+          </select>
+        </div>
+
+        <div class="actions-row">
+          <button id="mswToggleBtn" class="btn btn-secondary">
+            ⏹ Stop Mock Worker
+          </button>
+          <button id="loadSampleHarBtn" class="btn btn-secondary">
+            ⚡ Load Sample HAR Fixture
+          </button>
+          <button id="clearHarBtn" class="btn btn-secondary">
+            🧹 Clear HAR Mocks
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls Form -->
+      <div class="card">
+        <h2><span class="card-title-left">⚙️ Stream Configuration</span></h2>
+        <div class="form-grid form-grid-3">
+          <div class="form-group">
+            <label for="streamUrl">M3U8 Stream URL</label>
+            <input
+              type="text"
+              id="streamUrl"
+              placeholder="https://.../manifest.m3u8"
+              value="https://offline-har-player.local/video/master.m3u8"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="minHeight">Min Height (px)</label>
+            <input
+              type="number"
+              id="minHeight"
+              placeholder="e.g. 360"
+              value="360"
+              min="0"
+              step="10"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="maxHeight">Max Height (px)</label>
+            <input
+              type="number"
+              id="maxHeight"
+              placeholder="e.g. 720"
+              value="720"
+              min="0"
+              step="10"
+            />
+          </div>
+        </div>
+
+        <div class="presets-row">
+          <label for="presetSelect">Live & Remote Presets:</label>
+          <select id="presetSelect">
+            <option value="https://offline-har-player.local/video/master.m3u8">
+              Local HAR Fixture (360p, 720p, 1080p)
+            </option>
+            <option value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
+              Mux Big Buck Bunny (Live Remote)
+            </option>
+            <option value="https://cdn.jwplayer.com/manifests/pfx9vflz.m3u8">
+              Tears of Steel (Live Remote)
+            </option>
+            <option
+              value="https://playertest.longtailvideo.com/adaptive/elephants_dream/elephants_dream.m3u8"
+            >
+              Elephants Dream (Live Remote)
+            </option>
+            <option value="custom">Custom URL</option>
+          </select>
+        </div>
+
+        <div class="actions-row">
+          <button id="playBtn" class="btn">▶ Play Stream</button>
+          <button id="stopBtn" class="btn btn-secondary">⏹ Stop</button>
+          <button id="reloadBtn" class="btn btn-secondary">
+            🔄 Apply Filter & Reload
+          </button>
+        </div>
+      </div>
+
+      <!-- Player & Telemetry -->
+      <div class="card">
+        <h2>
+          <span class="card-title-left"
+            >📺 Video Player & Stream Telemetry</span
+          >
+        </h2>
+        <div class="player-section">
+          <div class="video-wrapper">
+            <video id="videoPlayer" controls playsinline></video>
+          </div>
+
+          <div class="telemetry-panel">
+            <div class="telemetry-card">
+              <h3>Player Status</h3>
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <span class="stat-label">Playback State</span>
+                  <span class="stat-value" id="statState"
+                    ><span class="badge badge-warning">Idle</span></span
+                  >
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Mode</span>
+                  <span class="stat-value" id="statMode">Auto (Filtered)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="telemetry-card">
+              <h3>Active Variant Metrics</h3>
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <span class="stat-label">Resolution</span>
+                  <span class="stat-value" id="statResolution">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Bitrate</span>
+                  <span class="stat-value" id="statBitrate">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Active Level Index</span>
+                  <span class="stat-value" id="statLevelIndex">--</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Buffer Length</span>
+                  <span class="stat-value" id="statBuffer">0.0s</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="telemetry-card">
+              <h3>Active Bounds</h3>
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <span class="stat-label">Min Height</span>
+                  <span class="stat-value" id="statMinH">360 px</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Max Height</span>
+                  <span class="stat-value" id="statMaxH">720 px</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variant Levels Table -->
+      <div class="card">
+        <h2>
+          <span class="card-title-left"
+            >📊 Manifest Variants (<span id="variantCount">0</span>
+            parsed)</span
+          >
+        </h2>
+        <p
+          style="
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 12px;
+          "
+        >
+          Variants highlighted in green match your <code>minHeight</code> and
+          <code>maxHeight</code> limits. Filtered out variants are dimmed.
+        </p>
+        <div style="overflow-x: auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Index</th>
+                <th>Resolution (W x H)</th>
+                <th>Height (px)</th>
+                <th>Bitrate</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="variantsTableBody">
+              <tr>
+                <td
+                  colspan="6"
+                  style="text-align: center; color: var(--text-muted)"
+                >
+                  No manifest loaded. Click "Play Stream" to fetch variants.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Event Console Log -->
+      <div class="card">
+        <h2><span class="card-title-left">📜 Event Log</span></h2>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

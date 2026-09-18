@@ -1,0 +1,23 @@
+{
+  "name": "har-player",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "hls.js": "^1.5.17",
+    "msw": "^2.7.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}
