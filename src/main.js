@@ -24,6 +24,10 @@ const stopBtn = document.getElementById("stopBtn");
 const reloadBtn = document.getElementById("reloadBtn");
 const videoPlayer = document.getElementById("videoPlayer");
 const bitmovinContainer = document.getElementById("bitmovinContainer");
+const bitmovinConfigContainer = document.getElementById(
+  "bitmovinConfigContainer",
+);
+const bitmovinConfigInput = document.getElementById("bitmovinConfig");
 
 const statEngine = document.getElementById("statEngine");
 const statState = document.getElementById("statState");
@@ -56,6 +60,16 @@ if (playerEngineSelect) {
   playerEngineSelect.value = currentEngine;
 }
 
+if (bitmovinConfigInput) {
+  const savedConfig = localStorage.getItem("bitmovin_custom_config");
+  if (savedConfig !== null) {
+    bitmovinConfigInput.value = savedConfig;
+  }
+  bitmovinConfigInput.addEventListener("input", () => {
+    localStorage.setItem("bitmovin_custom_config", bitmovinConfigInput.value);
+  });
+}
+
 let hls = null;
 let bitmovinPlayer = null;
 let bitmovinManualQualityId = null; // null represents Auto mode
@@ -71,11 +85,17 @@ function updateEngineUI() {
         '<span class="badge badge-warning">Bitmovin</span>';
     videoPlayer.style.display = "none";
     bitmovinContainer.style.display = "block";
+    if (bitmovinConfigContainer) {
+      bitmovinConfigContainer.style.display = "flex";
+    }
   } else {
     if (statEngine)
       statEngine.innerHTML = '<span class="badge badge-info">HLS.js</span>';
     bitmovinContainer.style.display = "none";
     videoPlayer.style.display = "block";
+    if (bitmovinConfigContainer) {
+      bitmovinConfigContainer.style.display = "none";
+    }
   }
 }
 updateEngineUI();
@@ -510,6 +530,28 @@ function playStream() {
   }
 }
 
+function isPlainObject(item) {
+  return item && typeof item === "object" && !Array.isArray(item);
+}
+
+function deepMerge(target, source) {
+  const output = { ...target };
+  if (isPlainObject(target) && isPlainObject(source)) {
+    Object.keys(source).forEach((key) => {
+      if (isPlainObject(source[key])) {
+        if (!(key in target) || !isPlainObject(target[key])) {
+          output[key] = source[key];
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        output[key] = source[key];
+      }
+    });
+  }
+  return output;
+}
+
 function playWithBitmovin(url) {
   const bitmovinKey = import.meta.env.VITE_BITMOVIN_KEY;
   if (!bitmovinKey || !bitmovinKey.trim()) {
@@ -531,7 +573,7 @@ function playWithBitmovin(url) {
   statMinH.textContent = isNaN(minH) || minH <= 0 ? "None" : `${minH} px`;
   statMaxH.textContent = isNaN(maxH) || maxH <= 0 ? "None" : `${maxH} px`;
 
-  const playerConfig = {
+  let playerConfig = {
     key: bitmovinKey.trim(),
     adaptation: {
       resolution: {
@@ -544,6 +586,29 @@ function playWithBitmovin(url) {
         UIFactory.buildUI(playerAPI, config),
     },
   };
+
+  const customConfigStr = bitmovinConfigInput
+    ? bitmovinConfigInput.value.trim()
+    : "";
+  if (customConfigStr) {
+    try {
+      const customConfig = JSON.parse(customConfigStr);
+      if (!isPlainObject(customConfig)) {
+        throw new Error(
+          "Custom configuration must be a valid JSON object (e.g. { ... })",
+        );
+      }
+      playerConfig = deepMerge(playerConfig, customConfig);
+      log("Custom Bitmovin configuration merged successfully", "info");
+    } catch (err) {
+      const errMsg = `❌ Bitmovin Custom Config Error: ${err.message}. Playback aborted.`;
+      log(errMsg, "error");
+      statState.innerHTML =
+        '<span class="badge badge-danger">Config Error</span>';
+      alert(errMsg);
+      return;
+    }
+  }
 
   try {
     bitmovinPlayer = new Player(bitmovinContainer, playerConfig);

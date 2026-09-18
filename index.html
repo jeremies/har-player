@@ -116,7 +116,8 @@
       }
 
       input,
-      select {
+      select,
+      textarea {
         background-color: var(--bg-color);
         border: 1px solid var(--border-color);
         border-radius: 6px;
@@ -130,9 +131,16 @@
       }
 
       input:focus,
-      select:focus {
+      select:focus,
+      textarea:focus {
         border-color: var(--accent);
         box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+      }
+
+      textarea {
+        font-family: monospace;
+        resize: vertical;
+        line-height: 1.4;
       }
 
       .presets-row {
@@ -547,6 +555,28 @@
               <option value="custom">Custom URL</option>
             </select>
           </div>
+        </div>
+
+        <div
+          id="bitmovinConfigContainer"
+          class="form-group"
+          style="display: none; margin-top: 14px"
+        >
+          <label for="bitmovinConfig">Bitmovin Custom Config (JSON):</label>
+          <textarea
+            id="bitmovinConfig"
+            rows="5"
+            placeholder='{
+  "playback": {
+    "muted": true,
+    "autoplay": false
+  },
+  "logs": {
+    "level": "debug"
+  }
+}'
+            spellcheck="false"
+          ></textarea>
         </div>
 
         <div class="actions-row">
