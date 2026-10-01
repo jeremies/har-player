@@ -78,6 +78,25 @@ let bitmovinManualQualityId = null; // null represents Auto mode
 // Ensure global bitmovin namespace exists for UI compatibility
 window.bitmovin = window.bitmovin || {};
 window.bitmovin.playerui = window.bitmovin.playerui || { UIFactory };
+
+// Expose player instances on window for console debugging
+window.videoPlayer = videoPlayer;
+
+Object.defineProperty(window, "player", {
+  get: () => (currentEngine === "bitmovin" ? bitmovinPlayer : hls),
+  configurable: true,
+});
+
+Object.defineProperty(window, "hls", {
+  get: () => hls,
+  configurable: true,
+});
+
+Object.defineProperty(window, "bitmovinPlayer", {
+  get: () => bitmovinPlayer,
+  configurable: true,
+});
+
 let availableLevels = [];
 let allowedLevelIds = [];
 let minAllowedIndex = -1;
@@ -628,6 +647,10 @@ function playWithBitmovin(url) {
   try {
     bitmovinContainer.innerHTML = "";
     bitmovinPlayer = new Player(bitmovinContainer, playerConfig);
+    console.log(
+      "Bitmovin Player ready. Accessible via window.player and window.bitmovinPlayer",
+      bitmovinPlayer,
+    );
     bitmovinManualQualityId = null;
 
     if (uiConfig !== false) {
@@ -720,6 +743,10 @@ function playWithHlsJs(url) {
       enableWorker: true,
       capLevelToPlayerSize: false,
     });
+    console.log(
+      "HLS.js player ready. Accessible via window.player and window.hls (HTML5 video element: window.videoPlayer)",
+      hls,
+    );
 
     hls.loadSource(url);
     hls.attachMedia(videoPlayer);
