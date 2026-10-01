@@ -2,6 +2,10 @@ import Hls from "hls.js";
 import { Player, PlayerEvent } from "bitmovin-player";
 import { UIFactory } from "bitmovin-player/bitmovinplayer-ui.js";
 import "bitmovin-player/bitmovinplayer-ui.css";
+import shaka from "shaka-player";
+
+// Install Shaka built-in polyfills
+shaka.polyfill.installAll();
 
 import {
   startWorker,
@@ -28,6 +32,8 @@ const bitmovinConfigContainer = document.getElementById(
   "bitmovinConfigContainer",
 );
 const bitmovinConfigInput = document.getElementById("bitmovinConfig");
+const shakaConfigContainer = document.getElementById("shakaConfigContainer");
+const shakaConfigInput = document.getElementById("shakaConfig");
 
 const statEngine = document.getElementById("statEngine");
 const statState = document.getElementById("statState");
@@ -70,10 +76,22 @@ if (bitmovinConfigInput) {
   });
 }
 
+if (shakaConfigInput) {
+  const savedShakaConfig = localStorage.getItem("shaka_custom_config");
+  if (savedShakaConfig !== null) {
+    shakaConfigInput.value = savedShakaConfig;
+  }
+  shakaConfigInput.addEventListener("input", () => {
+    localStorage.setItem("shaka_custom_config", shakaConfigInput.value);
+  });
+}
+
 let hls = null;
 let bitmovinPlayer = null;
 let bitmovinUIManager = null;
 let bitmovinManualQualityId = null; // null represents Auto mode
+let shakaPlayer = null;
+let shakaManualQualityId = null; // null represents Auto mode
 
 // Ensure global bitmovin namespace exists for UI compatibility
 window.bitmovin = window.bitmovin || {};
@@ -81,9 +99,14 @@ window.bitmovin.playerui = window.bitmovin.playerui || { UIFactory };
 
 // Expose player instances on window for console debugging
 window.videoPlayer = videoPlayer;
+window.shaka = shaka;
 
 Object.defineProperty(window, "player", {
-  get: () => (currentEngine === "bitmovin" ? bitmovinPlayer : hls),
+  get: () => {
+    if (currentEngine === "bitmovin") return bitmovinPlayer;
+    if (currentEngine === "shaka") return shakaPlayer;
+    return hls;
+  },
   configurable: true,
 });
 
@@ -94,6 +117,11 @@ Object.defineProperty(window, "hls", {
 
 Object.defineProperty(window, "bitmovinPlayer", {
   get: () => bitmovinPlayer,
+  configurable: true,
+});
+
+Object.defineProperty(window, "shakaPlayer", {
+  get: () => shakaPlayer,
   configurable: true,
 });
 
@@ -112,6 +140,21 @@ function updateEngineUI() {
     if (bitmovinConfigContainer) {
       bitmovinConfigContainer.style.display = "flex";
     }
+    if (shakaConfigContainer) {
+      shakaConfigContainer.style.display = "none";
+    }
+  } else if (currentEngine === "shaka") {
+    if (statEngine)
+      statEngine.innerHTML =
+        '<span class="badge badge-primary" style="background:#e11d48; color:#fff;">Shaka</span>';
+    bitmovinContainer.style.display = "none";
+    videoPlayer.style.display = "block";
+    if (bitmovinConfigContainer) {
+      bitmovinConfigContainer.style.display = "none";
+    }
+    if (shakaConfigContainer) {
+      shakaConfigContainer.style.display = "flex";
+    }
   } else {
     if (statEngine)
       statEngine.innerHTML = '<span class="badge badge-info">HLS.js</span>';
@@ -119,6 +162,9 @@ function updateEngineUI() {
     videoPlayer.style.display = "block";
     if (bitmovinConfigContainer) {
       bitmovinConfigContainer.style.display = "none";
+    }
+    if (shakaConfigContainer) {
+      shakaConfigContainer.style.display = "none";
     }
   }
 }
@@ -132,10 +178,10 @@ if (playerEngineSelect) {
       currentEngine = newEngine;
       localStorage.setItem("har_player_engine", currentEngine);
       updateEngineUI();
-      log(
-        `Switched active player engine to: ${currentEngine === "bitmovin" ? "Bitmovin Player" : "HLS.js"}`,
-        "info",
-      );
+      let engineName = "HLS.js";
+      if (currentEngine === "bitmovin") engineName = "Bitmovin Player";
+      if (currentEngine === "shaka") engineName = "Shaka Player";
+      log(`Switched active player engine to: ${engineName}`, "info");
     }
   });
 }
@@ -524,6 +570,26 @@ function applyLevelFilters() {
       `Applied Bitmovin adaptation resolution bounds: [${minSelectable}, ${maxSelectable === Infinity ? "Infinity" : maxSelectable}] px`,
       "info",
     );
+  } else if (currentEngine === "shaka" && shakaPlayer) {
+    const minSelectable = !isNaN(minH) && minH > 0 ? minH : 0;
+    const maxSelectable = !isNaN(maxH) && maxH > 0 ? maxH : Infinity;
+
+    shakaPlayer.configure({
+      restrictions: {
+        minHeight: minSelectable,
+        maxHeight: maxSelectable,
+      },
+      abr: {
+        restrictions: {
+          minHeight: minSelectable,
+          maxHeight: maxSelectable,
+        },
+      },
+    });
+    log(
+      `Applied Shaka Player height restrictions: [${minSelectable}, ${maxSelectable === Infinity ? "Infinity" : maxSelectable}] px`,
+      "info",
+    );
   }
 
   renderVariantsTable();
@@ -538,9 +604,10 @@ function playStream() {
   }
 
   logBox.innerHTML = "";
-  log(
-    `Initializing playback with [${currentEngine === "bitmovin" ? "Bitmovin Player" : "HLS.js"}]: ${url}`,
-  );
+  let engineLabel = "HLS.js";
+  if (currentEngine === "bitmovin") engineLabel = "Bitmovin Player";
+  if (currentEngine === "shaka") engineLabel = "Shaka Player";
+  log(`Initializing playback with [${engineLabel}]: ${url}`);
 
   stopActivePlayersOnly();
 
@@ -549,6 +616,8 @@ function playStream() {
 
   if (currentEngine === "bitmovin") {
     playWithBitmovin(url);
+  } else if (currentEngine === "shaka") {
+    playWithShaka(url);
   } else {
     playWithHlsJs(url);
   }
@@ -736,6 +805,176 @@ function playWithBitmovin(url) {
   }
 }
 
+async function playWithShaka(url) {
+  if (!shaka.Player.isBrowserSupported()) {
+    const msg = "Shaka Player is not supported in this browser.";
+    log(msg, "error");
+    alert(msg);
+    statState.innerHTML =
+      '<span class="badge badge-danger">Not Supported</span>';
+    return;
+  }
+
+  const minH = parseInt(minHeightInput.value, 10);
+  const maxH = parseInt(maxHeightInput.value, 10);
+  const minSelectable = !isNaN(minH) && minH > 0 ? minH : 0;
+  const maxSelectable = !isNaN(maxH) && maxH > 0 ? maxH : Infinity;
+
+  statMinH.textContent = isNaN(minH) || minH <= 0 ? "None" : `${minH} px`;
+  statMaxH.textContent = isNaN(maxH) || maxH <= 0 ? "None" : `${maxH} px`;
+
+  let playerConfig = {
+    restrictions: {
+      minHeight: minSelectable,
+      maxHeight: maxSelectable,
+    },
+    abr: {
+      enabled: true,
+      restrictions: {
+        minHeight: minSelectable,
+        maxHeight: maxSelectable,
+      },
+    },
+  };
+
+  const customConfigStr = shakaConfigInput
+    ? shakaConfigInput.value.trim()
+    : "";
+  if (customConfigStr) {
+    try {
+      const customConfig = JSON.parse(customConfigStr);
+      if (!isPlainObject(customConfig)) {
+        throw new Error(
+          "Custom configuration must be a valid JSON object (e.g. { ... })",
+        );
+      }
+      playerConfig = deepMerge(playerConfig, customConfig);
+      log("Custom Shaka Player configuration merged successfully", "info");
+    } catch (err) {
+      const errMsg = `❌ Shaka Custom Config Error: ${err.message}. Playback aborted.`;
+      log(errMsg, "error");
+      statState.innerHTML =
+        '<span class="badge badge-danger">Config Error</span>';
+      alert(errMsg);
+      return;
+    }
+  }
+
+  try {
+    shakaPlayer = new shaka.Player();
+    await shakaPlayer.attach(videoPlayer);
+    shakaPlayer.configure(playerConfig);
+    shakaManualQualityId = null;
+
+    console.log(
+      "Shaka Player ready. Accessible via window.player and window.shakaPlayer (HTML5 video element: window.videoPlayer)",
+      shakaPlayer,
+    );
+
+    shakaPlayer.addEventListener("error", (event) => {
+      const err = event.detail;
+      const code = err ? err.code : "unknown";
+      const message = err ? err.message : String(event);
+      log(`Shaka Player Error [${code}]: ${message}`, "error");
+      statState.innerHTML = '<span class="badge badge-danger">Error</span>';
+    });
+
+    shakaPlayer.addEventListener("buffering", (event) => {
+      if (event.buffering) {
+        statState.innerHTML =
+          '<span class="badge badge-warning">Buffering</span>';
+      } else if (!videoPlayer.paused) {
+        statState.innerHTML =
+          '<span class="badge badge-success">Playing</span>';
+      }
+    });
+
+    shakaPlayer.addEventListener("adaptation", () => {
+      const tracks = shakaPlayer.getVariantTracks();
+      const activeTrack = tracks.find((t) => t.active);
+      if (activeTrack) {
+        log(
+          `Shaka Adaptation switched to: ${activeTrack.width}x${activeTrack.height} (${formatBitrate(activeTrack.bandwidth)}) [id: ${activeTrack.id}]`,
+          "info",
+        );
+        updateTelemetry(activeTrack.id, {
+          width: activeTrack.width,
+          height: activeTrack.height,
+          bitrate: activeTrack.bandwidth,
+        });
+        renderVariantsTable();
+      }
+    });
+
+    shakaPlayer.addEventListener("variantchanged", (event) => {
+      const track =
+        event.track ||
+        shakaPlayer.getVariantTracks().find((t) => t.active);
+      if (track) {
+        log(
+          `Shaka Variant changed to: ${track.width}x${track.height} (${formatBitrate(track.bandwidth)}) [id: ${track.id}]`,
+          "info",
+        );
+        updateTelemetry(track.id, {
+          width: track.width,
+          height: track.height,
+          bitrate: track.bandwidth,
+        });
+        renderVariantsTable();
+      }
+    });
+
+    log(`Loading stream in Shaka Player: ${url}`, "info");
+    await shakaPlayer.load(url);
+
+    log("Shaka source loaded, reading variants...", "info");
+    const tracks = shakaPlayer.getVariantTracks();
+    log(
+      `Shaka Manifest parsed successfully. ${tracks.length} variant tracks found.`,
+      "info",
+    );
+
+    availableLevels = tracks.map((track, idx) => ({
+      id: track.id,
+      index: idx,
+      width: track.width,
+      height: track.height,
+      bitrate: track.bandwidth,
+    }));
+    variantCount.textContent = availableLevels.length;
+
+    applyLevelFilters();
+
+    const activeTrack = tracks.find((t) => t.active) || tracks[0];
+    if (activeTrack) {
+      updateTelemetry(activeTrack.id, {
+        width: activeTrack.width,
+        height: activeTrack.height,
+        bitrate: activeTrack.bandwidth,
+      });
+    }
+    renderVariantsTable();
+
+    videoPlayer
+      .play()
+      .then(() => {
+        statState.innerHTML =
+          '<span class="badge badge-success">Playing</span>';
+      })
+      .catch((err) => {
+        log(`Autoplay failed or blocked: ${err.message}`, "warn");
+        statState.innerHTML =
+          '<span class="badge badge-warning">Paused</span>';
+      });
+  } catch (err) {
+    log(
+      `Failed to create or load Shaka Player: ${err.message || err}`,
+      "error",
+    );
+    statState.innerHTML = '<span class="badge badge-danger">Error</span>';
+  }
+}
+
 function playWithHlsJs(url) {
   if (Hls.isSupported()) {
     hls = new Hls({
@@ -857,6 +1096,15 @@ function stopActivePlayersOnly() {
     hls.destroy();
     hls = null;
   }
+  if (shakaPlayer) {
+    try {
+      shakaPlayer.destroy();
+    } catch {
+      // ignore
+    }
+    shakaPlayer = null;
+  }
+  shakaManualQualityId = null;
   if (videoPlayer) {
     videoPlayer.pause();
     videoPlayer.removeAttribute("src");
@@ -916,6 +1164,11 @@ function updateTelemetry(levelIdentifier, level) {
       bitmovinManualQualityId === null
         ? "Auto (Filtered)"
         : `Manual (${bitmovinManualQualityId})`;
+  } else if (currentEngine === "shaka") {
+    statMode.textContent =
+      shakaManualQualityId === null
+        ? "Auto (Filtered)"
+        : `Manual (Track #${shakaManualQualityId})`;
   } else {
     statMode.textContent =
       hls && hls.autoLevelEnabled
@@ -938,6 +1191,32 @@ export function setManualLevel(id) {
       statMode.textContent = `Manual (${id})`;
       log(`Locked Bitmovin manually to quality ${id}`, "info");
     }
+  } else if (currentEngine === "shaka") {
+    if (!shakaPlayer) return;
+    if (id === "auto" || id === -1 || id === "-1") {
+      shakaManualQualityId = null;
+      shakaPlayer.configure({ abr: { enabled: true } });
+      statMode.textContent = "Auto (Filtered)";
+      log("Switched Shaka Player to Filtered Auto Mode", "info");
+    } else {
+      shakaManualQualityId = String(id);
+      shakaPlayer.configure({ abr: { enabled: false } });
+      const tracks = shakaPlayer.getVariantTracks();
+      const targetTrack = tracks.find((t) => String(t.id) === String(id));
+      if (targetTrack) {
+        // Seamless switching: clearBuffer = false
+        shakaPlayer.selectVariantTrack(targetTrack, false);
+        statMode.textContent = `Manual (Track #${id})`;
+        log(`Locked Shaka Player manually to variant track #${id}`, "info");
+        updateTelemetry(targetTrack.id, {
+          width: targetTrack.width,
+          height: targetTrack.height,
+          bitrate: targetTrack.bandwidth,
+        });
+      } else {
+        log(`Shaka variant track ${id} not found`, "warn");
+      }
+    }
   } else {
     if (!hls) return;
     if (id === "auto" || id === -1 || id === "-1") {
@@ -958,14 +1237,20 @@ function renderVariantsTable() {
   if (!availableLevels.length) return;
 
   const isBitmovin = currentEngine === "bitmovin";
+  const isShaka = currentEngine === "shaka";
   const isAutoActive = isBitmovin
     ? bitmovinManualQualityId === null
-    : hls && hls.autoLevelEnabled;
+    : isShaka
+      ? shakaManualQualityId === null
+      : hls && hls.autoLevelEnabled;
 
   let activeQualityId = null;
   if (isBitmovin && bitmovinPlayer) {
     const q = bitmovinPlayer.getVideoQuality();
     activeQualityId = q ? q.id : null;
+  } else if (isShaka && shakaPlayer) {
+    const activeTrack = shakaPlayer.getVariantTracks().find((t) => t.active);
+    activeQualityId = activeTrack ? activeTrack.id : null;
   } else if (hls) {
     activeQualityId = hls.loadLevel >= 0 ? hls.loadLevel : hls.currentLevel;
   }
@@ -994,8 +1279,11 @@ function renderVariantsTable() {
     const isCurrent = isBitmovin
       ? bitmovinManualQualityId === String(levelId) ||
         (isAutoActive && String(activeQualityId) === String(levelId))
-      : (hls && hls.currentLevel === idx) ||
-        (isAutoActive && activeQualityId === idx);
+      : isShaka
+        ? shakaManualQualityId === String(levelId) ||
+          (isAutoActive && String(activeQualityId) === String(levelId))
+        : (hls && hls.currentLevel === idx) ||
+          (isAutoActive && activeQualityId === idx);
 
     let trClass = isAllowed ? "allowed-variant" : "filtered-variant";
     if (isCurrent) trClass += " active-variant";
@@ -1040,12 +1328,12 @@ function renderVariantsTable() {
 
 // Video events
 videoPlayer.addEventListener("play", () => {
-  if (currentEngine === "hlsjs") {
+  if (currentEngine === "hlsjs" || currentEngine === "shaka") {
     statState.innerHTML = '<span class="badge badge-success">Playing</span>';
   }
 });
 videoPlayer.addEventListener("pause", () => {
-  if (currentEngine === "hlsjs") {
+  if (currentEngine === "hlsjs" || currentEngine === "shaka") {
     statState.innerHTML = '<span class="badge badge-warning">Paused</span>';
   }
 });

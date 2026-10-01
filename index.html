@@ -530,6 +530,7 @@
             <select id="playerEngineSelect">
               <option value="hlsjs">HLS.js (Default)</option>
               <option value="bitmovin">Bitmovin Player</option>
+              <option value="shaka">Shaka Player</option>
             </select>
           </div>
 
@@ -573,6 +574,27 @@
   },
   "logs": {
     "level": "debug"
+  }
+}'
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <div
+          id="shakaConfigContainer"
+          class="form-group"
+          style="display: none; margin-top: 14px"
+        >
+          <label for="shakaConfig">Shaka Player Custom Config (JSON):</label>
+          <textarea
+            id="shakaConfig"
+            rows="5"
+            placeholder='{
+  "streaming": {
+    "bufferingGoal": 30
+  },
+  "abr": {
+    "enabled": true
   }
 }'
             spellcheck="false"
