@@ -72,7 +72,12 @@ if (bitmovinConfigInput) {
 
 let hls = null;
 let bitmovinPlayer = null;
+let bitmovinUIManager = null;
 let bitmovinManualQualityId = null; // null represents Auto mode
+
+// Ensure global bitmovin namespace exists for UI compatibility
+window.bitmovin = window.bitmovin || {};
+window.bitmovin.playerui = window.bitmovin.playerui || { UIFactory };
 let availableLevels = [];
 let allowedLevelIds = [];
 let minAllowedIndex = -1;
@@ -573,17 +578,18 @@ function playWithBitmovin(url) {
   statMinH.textContent = isNaN(minH) || minH <= 0 ? "None" : `${minH} px`;
   statMaxH.textContent = isNaN(maxH) || maxH <= 0 ? "None" : `${maxH} px`;
 
+  let uiConfig = {
+    playbackSpeedSelectionEnabled: true,
+  };
+
   let playerConfig = {
     key: bitmovinKey.trim(),
+    ui: false, // Disable Bitmovin's internal script loader so bundled UIFactory is used cleanly
     adaptation: {
       resolution: {
         minSelectableVideoHeight: minSelectable,
         maxSelectableVideoHeight: maxSelectable,
       },
-    },
-    style: {
-      uiManagerFactory: (playerAPI, config) =>
-        UIFactory.buildUI(playerAPI, config),
     },
   };
 
@@ -598,7 +604,16 @@ function playWithBitmovin(url) {
           "Custom configuration must be a valid JSON object (e.g. { ... })",
         );
       }
+      if ("ui" in customConfig) {
+        if (customConfig.ui === false) {
+          uiConfig = false;
+        } else if (isPlainObject(customConfig.ui)) {
+          uiConfig = deepMerge(uiConfig, customConfig.ui);
+        }
+        delete customConfig.ui;
+      }
       playerConfig = deepMerge(playerConfig, customConfig);
+      playerConfig.ui = false; // Keep ui: false on playerConfig so internal script fetch is skipped
       log("Custom Bitmovin configuration merged successfully", "info");
     } catch (err) {
       const errMsg = `❌ Bitmovin Custom Config Error: ${err.message}. Playback aborted.`;
@@ -611,8 +626,14 @@ function playWithBitmovin(url) {
   }
 
   try {
+    bitmovinContainer.innerHTML = "";
     bitmovinPlayer = new Player(bitmovinContainer, playerConfig);
     bitmovinManualQualityId = null;
+
+    if (uiConfig !== false) {
+      bitmovinUIManager = UIFactory.buildUI(bitmovinPlayer, uiConfig);
+      log("Bitmovin Web UI controls initialized", "info");
+    }
 
     bitmovinPlayer.on(PlayerEvent.SourceLoaded, () => {
       const qualities = bitmovinPlayer.getAvailableVideoQualities();
@@ -814,6 +835,14 @@ function stopActivePlayersOnly() {
     videoPlayer.removeAttribute("src");
     videoPlayer.load();
   }
+  if (bitmovinUIManager) {
+    try {
+      bitmovinUIManager.release();
+    } catch {
+      // ignore
+    }
+    bitmovinUIManager = null;
+  }
   if (bitmovinPlayer) {
     try {
       bitmovinPlayer.destroy();
@@ -821,6 +850,9 @@ function stopActivePlayersOnly() {
       // ignore
     }
     bitmovinPlayer = null;
+  }
+  if (bitmovinContainer) {
+    bitmovinContainer.innerHTML = "";
   }
   bitmovinManualQualityId = null;
 }
