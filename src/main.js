@@ -86,6 +86,42 @@ if (shakaConfigInput) {
   });
 }
 
+function updateBoundsTelemetry() {
+  const minH = parseInt(minHeightInput.value, 10);
+  const maxH = parseInt(maxHeightInput.value, 10);
+  if (statMinH) {
+    statMinH.textContent = isNaN(minH) || minH <= 0 ? "None" : `${minH} px`;
+  }
+  if (statMaxH) {
+    statMaxH.textContent = isNaN(maxH) || maxH <= 0 ? "None" : `${maxH} px`;
+  }
+}
+
+if (minHeightInput) {
+  const savedMinHeight = localStorage.getItem("har_player_min_height");
+  if (savedMinHeight !== null) {
+    minHeightInput.value = savedMinHeight;
+  }
+  minHeightInput.addEventListener("input", () => {
+    localStorage.setItem("har_player_min_height", minHeightInput.value);
+    updateBoundsTelemetry();
+  });
+}
+
+if (maxHeightInput) {
+  const savedMaxHeight = localStorage.getItem("har_player_max_height");
+  if (savedMaxHeight !== null) {
+    maxHeightInput.value = savedMaxHeight;
+  }
+  maxHeightInput.addEventListener("input", () => {
+    localStorage.setItem("har_player_max_height", maxHeightInput.value);
+    updateBoundsTelemetry();
+  });
+}
+
+updateBoundsTelemetry();
+
+
 let hls = null;
 let bitmovinPlayer = null;
 let bitmovinUIManager = null;
