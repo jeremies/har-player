@@ -139,7 +139,6 @@ if (maxHeightInput) {
 
 updateBoundsTelemetry();
 
-
 let hls = null;
 let bitmovinPlayer = null;
 let bitmovinUIManager = null;
@@ -244,7 +243,9 @@ function log(msg, type = "info") {
   const time = new Date().toLocaleTimeString();
   const div = document.createElement("div");
   div.className = `log-entry ${type}`;
-  div.textContent = `[${time}] ${msg}`;
+  const textContent = `[${time}] ${msg}`;
+  div.textContent = textContent;
+  console.log(textContent);
   logBox.appendChild(div);
   logBox.scrollTop = logBox.scrollHeight;
 }
@@ -891,9 +892,7 @@ async function playWithShaka(url) {
     },
   };
 
-  const customConfigStr = shakaConfigInput
-    ? shakaConfigInput.value.trim()
-    : "";
+  const customConfigStr = shakaConfigInput ? shakaConfigInput.value.trim() : "";
   if (customConfigStr) {
     try {
       const customConfig = JSON.parse(customConfigStr);
@@ -962,8 +961,7 @@ async function playWithShaka(url) {
 
     shakaPlayer.addEventListener("variantchanged", (event) => {
       const track =
-        event.track ||
-        shakaPlayer.getVariantTracks().find((t) => t.active);
+        event.track || shakaPlayer.getVariantTracks().find((t) => t.active);
       if (track) {
         log(
           `Shaka Variant changed to: ${track.width}x${track.height} (${formatBitrate(track.bandwidth)}) [id: ${track.id}]`,
@@ -1017,8 +1015,7 @@ async function playWithShaka(url) {
       })
       .catch((err) => {
         log(`Autoplay failed or blocked: ${err.message}`, "warn");
-        statState.innerHTML =
-          '<span class="badge badge-warning">Paused</span>';
+        statState.innerHTML = '<span class="badge badge-warning">Paused</span>';
       });
   } catch (err) {
     log(
