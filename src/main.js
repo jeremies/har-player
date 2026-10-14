@@ -15,12 +15,18 @@ import {
   onRequestIntercepted,
   onRequestUnhandled,
 } from "./mocks/browser.js";
-import { loadHarData, clearHar, getLoadedHarInfo } from "./mocks/har-loader.js";
+import {
+  loadHarData,
+  clearHar,
+  getLoadedHarInfo,
+  setManifestHeightFilter,
+} from "./mocks/har-loader.js";
 
 // DOM Elements
 const streamUrlInput = document.getElementById("streamUrl");
 const minHeightInput = document.getElementById("minHeight");
 const maxHeightInput = document.getElementById("maxHeight");
+const tweakMasterManifestInput = document.getElementById("tweakMasterManifest");
 const presetSelect = document.getElementById("presetSelect");
 const playerEngineSelect = document.getElementById("playerEngineSelect");
 const playBtn = document.getElementById("playBtn");
@@ -115,6 +121,29 @@ function updateBoundsTelemetry() {
   }
 }
 
+function updateManifestHeightFilter() {
+  setManifestHeightFilter({
+    enabled: tweakMasterManifestInput.checked,
+    minHeight: Number.parseInt(minHeightInput.value, 10),
+    maxHeight: Number.parseInt(maxHeightInput.value, 10),
+  });
+}
+
+const savedManifestFilter = localStorage.getItem(
+  "har_player_tweak_master_manifest",
+);
+if (savedManifestFilter !== null) {
+  tweakMasterManifestInput.checked = savedManifestFilter === "true";
+}
+tweakMasterManifestInput.addEventListener("change", () => {
+  localStorage.setItem(
+    "har_player_tweak_master_manifest",
+    String(tweakMasterManifestInput.checked),
+  );
+  updateManifestHeightFilter();
+  if (availableLevels.length) playStream();
+});
+
 if (minHeightInput) {
   const savedMinHeight = localStorage.getItem("har_player_min_height");
   if (savedMinHeight !== null) {
@@ -123,6 +152,7 @@ if (minHeightInput) {
   minHeightInput.addEventListener("input", () => {
     localStorage.setItem("har_player_min_height", minHeightInput.value);
     updateBoundsTelemetry();
+    updateManifestHeightFilter();
   });
 }
 
@@ -134,10 +164,12 @@ if (maxHeightInput) {
   maxHeightInput.addEventListener("input", () => {
     localStorage.setItem("har_player_max_height", maxHeightInput.value);
     updateBoundsTelemetry();
+    updateManifestHeightFilter();
   });
 }
 
 updateBoundsTelemetry();
+updateManifestHeightFilter();
 
 let hls = null;
 let bitmovinPlayer = null;
@@ -1393,7 +1425,9 @@ videoPlayer.addEventListener("pause", () => {
 playBtn.addEventListener("click", playStream);
 stopBtn.addEventListener("click", stopStream);
 reloadBtn.addEventListener("click", () => {
-  if (availableLevels.length) {
+  if (tweakMasterManifestInput.checked) {
+    playStream();
+  } else if (availableLevels.length) {
     applyLevelFilters();
   } else {
     playStream();

@@ -124,6 +124,21 @@
         gap: 6px;
       }
 
+      .manifest-filter-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .manifest-filter-toggle input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        padding: 0;
+        accent-color: var(--accent);
+      }
+
       label {
         font-size: 0.875rem;
         font-weight: 600;
@@ -540,6 +555,11 @@
             />
           </div>
         </div>
+
+        <label class="manifest-filter-toggle" for="tweakMasterManifest">
+          <input id="tweakMasterManifest" type="checkbox" />
+          Filter video variants in master m3u8 file response
+        </label>
 
         <div class="presets-row">
           <div style="display: flex; align-items: center; gap: 8px">

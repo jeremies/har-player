@@ -54,9 +54,80 @@ function buildResponseHeaders(rawHeaders, mimeType) {
  */
 let currentHarInfo = null;
 let currentHarHandler = null;
+let manifestHeightFilter = {
+  enabled: false,
+  minHeight: 0,
+  maxHeight: 0,
+};
 
 export function getLoadedHarInfo() {
   return currentHarInfo;
+}
+
+export function setManifestHeightFilter(filter) {
+  manifestHeightFilter = { ...filter };
+}
+
+export function filterMasterManifest(manifest, { minHeight, maxHeight }) {
+  const min = Number.isFinite(minHeight) && minHeight > 0 ? minHeight : null;
+  const max = Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : null;
+  if (min === null && max === null) return manifest;
+
+  const newline = manifest.includes("\r\n") ? "\r\n" : "\n";
+  const lines = manifest.split(/\r?\n/);
+  const filteredLines = [];
+  let skipVariantUri = false;
+  let changed = false;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (skipVariantUri) {
+      if (!trimmedLine || trimmedLine.startsWith("#")) {
+        filteredLines.push(line);
+        continue;
+      }
+      skipVariantUri = false;
+      changed = true;
+      continue;
+    }
+
+    const streamInfo = trimmedLine.match(/^#EXT-X-STREAM-INF:(.*)$/i);
+    const resolution = streamInfo?.[1].match(
+      /(?:^|,)\s*RESOLUTION=(\d+)x(\d+)(?=,|$)/i,
+    );
+    if (resolution) {
+      const height = Number(resolution[2]);
+      const belowMin = min !== null && height < min;
+      const aboveMax = max !== null && height > max;
+      if (belowMin || aboveMax) {
+        changed = true;
+        skipVariantUri = true;
+        continue;
+      }
+    }
+    filteredLines.push(line);
+  }
+
+  return changed ? filteredLines.join(newline) : manifest;
+}
+
+function filterManifestResponse(response, body) {
+  const filteredBody = filterMasterManifest(body, manifestHeightFilter);
+  if (filteredBody === body) return null;
+
+  const headers = new Headers(response.headers);
+  for (const header of ["content-length", "content-encoding", "content-md5"]) {
+    headers.delete(header);
+  }
+  return new HttpResponse(filteredBody, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function isM3u8Request(request) {
+  return new URL(request.url).pathname.toLowerCase().endsWith(".m3u8");
 }
 
 /**
@@ -167,7 +238,7 @@ export function loadHarData(harJsonString, filename = "recording.har") {
   }
 
   // Create an MSW catch-all HTTP handler that checks the loaded HAR entries
-  currentHarHandler = http.all("*", ({ request }) => {
+  currentHarHandler = http.all("*", async ({ request }) => {
     const method = request.method.toUpperCase();
     const fullUrl = request.url;
 
@@ -195,11 +266,44 @@ export function loadHarData(harJsonString, filename = "recording.har") {
       const respHeaders = new Headers();
       match.headers.forEach((val, key) => respHeaders.set(key, val));
 
+      if (
+        manifestHeightFilter.enabled &&
+        method === "GET" &&
+        match.status === 200 &&
+        typeof match.bodyData === "string"
+      ) {
+        const filteredResponse = filterManifestResponse(
+          {
+            headers: respHeaders,
+            status: match.status,
+            statusText: match.statusText,
+          },
+          match.bodyData,
+        );
+        if (filteredResponse) return filteredResponse;
+      }
+
       return new HttpResponse(match.bodyData, {
         status: match.status,
         statusText: match.statusText,
         headers: respHeaders,
       });
+    }
+
+    if (
+      manifestHeightFilter.enabled &&
+      method === "GET" &&
+      isM3u8Request(request)
+    ) {
+      const response = await fetch(request);
+      if (response.status === 200) {
+        const filteredResponse = filterManifestResponse(
+          response,
+          await response.clone().text(),
+        );
+        if (filteredResponse) return filteredResponse;
+      }
+      return response;
     }
 
     // Let unhandled requests pass through (MSW will warn if onUnhandledRequest='warn')
