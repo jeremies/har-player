@@ -48,6 +48,21 @@
         margin-bottom: 8px;
       }
 
+      .external-script-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .external-script-toggle input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        padding: 0;
+        accent-color: var(--accent);
+      }
+
       header h1 {
         font-size: 2.1rem;
         font-weight: 700;
@@ -417,6 +432,10 @@
   <body>
     <div class="container">
       <header>
+        <label class="external-script-toggle">
+          <input id="targetScriptToggle" type="checkbox" />
+          Load chii
+        </label>
         <h1>📡 HAR Player & HLS Filter</h1>
         <p>
           Play M3U8 video streams from network URLs or replay captured traffic

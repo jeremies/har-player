@@ -59,6 +59,24 @@ const harInfoBox = document.getElementById("harInfoBox");
 const harDiscoveredStreamsSelect = document.getElementById(
   "harDiscoveredStreamsSelect",
 );
+const targetScriptToggle = document.getElementById("targetScriptToggle");
+
+if (targetScriptToggle) {
+  targetScriptToggle.addEventListener("change", () => {
+    const existingScript = document.getElementById("atresmediaTargetScript");
+    if (targetScriptToggle.checked) {
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.id = "atresmediaTargetScript";
+        script.src = "https://tv-socket.atresmedia.com/target.js";
+        script.async = true;
+        document.head.append(script);
+      }
+    } else {
+      existingScript?.remove();
+    }
+  });
+}
 
 // State
 let currentEngine = localStorage.getItem("har_player_engine") || "hlsjs";
