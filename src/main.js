@@ -27,6 +27,9 @@ const streamUrlInput = document.getElementById("streamUrl");
 const minHeightInput = document.getElementById("minHeight");
 const maxHeightInput = document.getElementById("maxHeight");
 const tweakMasterManifestInput = document.getElementById("tweakMasterManifest");
+const deleteMasterSubtitlesInput = document.getElementById(
+  "deleteMasterSubtitles",
+);
 const presetSelect = document.getElementById("presetSelect");
 const playerEngineSelect = document.getElementById("playerEngineSelect");
 const playBtn = document.getElementById("playBtn");
@@ -123,9 +126,11 @@ function updateBoundsTelemetry() {
 
 function updateManifestHeightFilter() {
   setManifestHeightFilter({
-    enabled: tweakMasterManifestInput.checked,
+    enabled:
+      tweakMasterManifestInput.checked || deleteMasterSubtitlesInput.checked,
     minHeight: Number.parseInt(minHeightInput.value, 10),
     maxHeight: Number.parseInt(maxHeightInput.value, 10),
+    deleteSubtitles: deleteMasterSubtitlesInput.checked,
   });
 }
 
@@ -139,6 +144,21 @@ tweakMasterManifestInput.addEventListener("change", () => {
   localStorage.setItem(
     "har_player_tweak_master_manifest",
     String(tweakMasterManifestInput.checked),
+  );
+  updateManifestHeightFilter();
+  if (availableLevels.length) playStream();
+});
+
+const savedDeleteMasterSubtitles = localStorage.getItem(
+  "har_player_delete_master_subtitles",
+);
+if (savedDeleteMasterSubtitles !== null) {
+  deleteMasterSubtitlesInput.checked = savedDeleteMasterSubtitles === "true";
+}
+deleteMasterSubtitlesInput.addEventListener("change", () => {
+  localStorage.setItem(
+    "har_player_delete_master_subtitles",
+    String(deleteMasterSubtitlesInput.checked),
   );
   updateManifestHeightFilter();
   if (availableLevels.length) playStream();
@@ -1425,7 +1445,10 @@ videoPlayer.addEventListener("pause", () => {
 playBtn.addEventListener("click", playStream);
 stopBtn.addEventListener("click", stopStream);
 reloadBtn.addEventListener("click", () => {
-  if (tweakMasterManifestInput.checked) {
+  if (
+    tweakMasterManifestInput.checked ||
+    deleteMasterSubtitlesInput.checked
+  ) {
     playStream();
   } else if (availableLevels.length) {
     applyLevelFilters();

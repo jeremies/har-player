@@ -58,6 +58,7 @@ let manifestHeightFilter = {
   enabled: false,
   minHeight: 0,
   maxHeight: 0,
+  deleteSubtitles: false,
 };
 
 export function getLoadedHarInfo() {
@@ -68,10 +69,13 @@ export function setManifestHeightFilter(filter) {
   manifestHeightFilter = { ...filter };
 }
 
-export function filterMasterManifest(manifest, { minHeight, maxHeight }) {
+export function filterMasterManifest(
+  manifest,
+  { minHeight, maxHeight, deleteSubtitles = false },
+) {
   const min = Number.isFinite(minHeight) && minHeight > 0 ? minHeight : null;
   const max = Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : null;
-  if (min === null && max === null) return manifest;
+  if (min === null && max === null && !deleteSubtitles) return manifest;
 
   const newline = manifest.includes("\r\n") ? "\r\n" : "\n";
   const lines = manifest.split(/\r?\n/);
@@ -81,6 +85,13 @@ export function filterMasterManifest(manifest, { minHeight, maxHeight }) {
 
   for (const line of lines) {
     const trimmedLine = line.trim();
+    if (
+      deleteSubtitles &&
+      /^#EXT-X-MEDIA:\s*TYPE=SUBTITLES(?:,|$)/i.test(trimmedLine)
+    ) {
+      changed = true;
+      continue;
+    }
     if (skipVariantUri) {
       if (!trimmedLine || trimmedLine.startsWith("#")) {
         filteredLines.push(line);
